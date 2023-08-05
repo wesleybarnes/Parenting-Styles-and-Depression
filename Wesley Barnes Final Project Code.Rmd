@@ -1,0 +1,175 @@
+---
+html_document:
+  df_print: kable
+author: "Wesley Barnes"
+date: "Spring Semester 2023"
+output:
+  word_document:
+  pdf_document: default
+  html_document:
+    df_print: paged
+title: "Associations between parenting styles and depression"
+pdf_document:
+  df_print: kable
+editor_options: 
+  markdown: 
+    wrap: 72
+zotero: "HGAPS"
+---
+
+```{r setup}
+library(tidyverse) #wrangling
+library(haven) #importing SPSS and other data formats
+library(ggplot2) #deluxe graphics
+library(ggExtra) #extra fancy graphics
+library(psych) #one package that covers ~80% of what we use in psychology 
+library(rstatix) #a package that offers useful options for correlation tables, ANOVA
+library(vcd) #visual displays of categorical data
+library(mosaic) #more tools for categorical data
+library(rockchalk) #useful for intermediate/advanced regression analyses
+library(beeswarm)
+library(decoder)
+library(devtools)
+library(ggcorrplot)
+library(dplyr) # load dplyr
+library(knitr)
+options(digits = 3, scipen = NULL)
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Note: v3.2 of the data had an error in item 10 (it was accidentally
+over-written by the 10 item scale score)
+
+```{r Load data}
+# [] come back to this and load the datasets for class
+ku2019<-read_spss("Korea_Spring_Fall_2017 v5 (safe)+2018+2019+Spr2020 (1).sav")
+```
+
+
+#Stuff for 525 ##Checking assumptions
+
+```{r Checking assumptions; add gender/sex to subset}
+modelvars<-ku2019 %>% select('Gender','Race', 'Age','gbi7up', 'apqMomInvolveP',	
+                               'apqDadInvolveP', 'apqPosParP', 'apqPoorMonP', 'apqInconDiscP', 'apqCorpPunP', 'IAPfacAuthoritative', 'IAPfacAuthoritarian') #make data subset
+describe(modelvars) #Get N, min & max (compare to source docs), skew & kurtosis
+pairs.panels(modelvars) #Look at histograms, scatterplots, LOESS smoother
+```
+
+##Basic missing data handling -- listwise deletion Contrast this with
+"pairwise," earlier.
+
+```{r Listwise delete}
+modelvars<-na.omit(modelvars)
+describe(modelvars) #Get N, min & max (compare to source docs), skew & kurtosis
+pairs.panels(modelvars) #Look at histograms, scatterplots, LOESS smoother
+```
+
+```{r  Descriptives}
+get_summary_stats(modelvars) #gives IQR, but no skew or kurtosis
+
+freq_table(modelvars, gbi7up) # Gives counts and bin percentages, not cumulative
+
+mahalanobis_distance(modelvars) %>% arrange(desc(mahal.dist)) #very helpful for outliers
+
+```
+# Correlations
+
+```{r Correlations}
+cor.mat <- modelvars %>% cor_mat() #table of coefficients (Pearson as default)
+cor.mat
+
+cor.mat %>% cor_get_pval() #table of p values
+
+cor.mat %>%
+  cor_as_symbols() %>%
+  pull_lower_triangle() #triangle of asterisks
+```
+
+
+# R and R squared value
+
+```{r and R^2 value}
+
+#r
+cor(modelvars$apqDadInvolveP*modelvars$Race, modelvars$gbi7up)
+
+# r squared
+summary(setCor(gbi7up~apqDadInvolveP:Race, data=modelvars, std=TRUE))
+
+```
+
+
+# Total Correlation Plot
+
+```{Total Correlation Plot}
+
+ggcorrplot(cor(modelvars),
+           hc.order = TRUE,
+           type = "lower",
+           outline.color = "white")
+```
+
+
+# Inconsistent Discipline and Depression
+
+```{Inconsistent Discipline and Depression}
+beeswarm(gbi7up ~ apqInconDiscP, data = modelvars,
+         method ='swarm',
+         pch =16, 
+         col =c("#4B9CD3"),
+         xlab ='Inconsistent Discipline', ylab ='Depression',
+         main ="Inconsistent Discipline and Depression")
+boxplot(gbi7up ~ apqInconDiscP, data = modelvars,add = T, col =c("#3256a822","#a8325822"), border ="black")
+```
+
+
+```{Poor Montioring and Depression}
+beeswarm(gbi7up ~ apqPoorMonP, data = modelvars,
+         method ='swarm',
+         pch =16, 
+         col =c("gold"),
+         xlab ='Poor Monitoring', ylab ='Depression',
+         main ="Poor Monitoring and Depression")
+boxplot(gbi7up ~ apqPoorMonP, data = modelvars,add = T, col =c("#3256a822","#a8325822"), border ="black")
+
+```
+
+
+
+# Multiple Regression Including Race
+
+
+```{Multiple Regression Including Race}
+
+
+DepressionGraph = ggplot(modelvars, aes(x=gbi7up, y=apqDadInvolveP,colour=as.factor(Race)))+geom_point() + 
+  scale_color_manual(values=c("#7BAFD4", "black",'#8D9092','gold')) + geom_smooth(method="lm", se=FALSE) +
+  xlab("Paternal Involvement")+ ylab("Depression Score") +ggtitle("Paternal Involvement and Depression Scores, with Race")
+
+ggMarginal(DepressionGraph, groupColour=TRUE, groupFill = TRUE)
+DepressionGraph
+
+```
+
+
+# Paternal Involvement Correlations
+
+```{r}
+
+# normal paternal involvement correlative score
+cor(modelvars$apqDadInvolveP, modelvars$gbi7up)
+
+# isolated correlative score (African Americans)
+AA = modelvars[modelvars$Race==3,]
+cor(AA$apqDadInvolveP, AA$gbi7up)
+
+
+```
+
+```{r}
+#write.csv(modelvars, "WesleyBarnesSufficientData.csv")
+```
+
+
+
+
